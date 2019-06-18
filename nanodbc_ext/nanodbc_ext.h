@@ -1,3 +1,6 @@
 #pragma once 
-#include <nanodbc/statement2.h>
-#include <nanodbc/nanodbc_async.h>
+#ifndef NANODBC_ENABLE_UNICODE
+#define NANODBC_ENABLE_UNICODE 1
+#endif
+#include <nanodbc_ext/statement2.h>
+#include <nanodbc_ext/nanodbc_async.h>

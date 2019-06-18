@@ -1,7 +1,4 @@
 #pragma once 
-#ifndef NANODBC_ENABLE_UNICODE
-#define NANODBC_ENABLE_UNICODE 1
-#endif
 #include <nanodbc/nanodbc.h>
 #include <folly/futures/Future.h>
 namespace nanodbc
