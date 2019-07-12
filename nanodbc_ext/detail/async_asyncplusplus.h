@@ -7,11 +7,13 @@
 #include <async++.h>
 namespace nanodbc
 {
-async::shared_task<bool> async_connect(connection &con, const string &connection_string, long timeout = 0);
-async::shared_task<void> async_prepare(statement &stm, const string &query, long timeout = 0);
-async::shared_task<result> async_execute(statement &stm, long batch_operations = 1, long timeout = 0);
-async::shared_task<result> async_execute_direct(statement &stm, class connection &conn, const string &query, long batch_operations = 1, long timeout = 0);
-async::shared_task<bool> async_next(result &ret);
+    async::shared_task<bool> async_connect(connection &con, const string &connection_string, long timeout = 0);
+    async::shared_task<void> async_prepare(statement &stm, const string &query, long timeout = 0);
+    async::shared_task<result> async_execute(statement &stm, long batch_operations = 1, long timeout = 0);
+    async::shared_task<result> async_execute_direct(statement &stm, class connection &conn, const string &query, long batch_operations = 1, long timeout = 0);
+    async::shared_task<bool> async_next(result &ret);
+    template<typename T>
+    using future = async::task<T>;
 } // namespace nanodbc
 #if NANODBC_HEADER_ONLY
 #include <nanodbc_ext/detail/async_asyncplusplus-inl.h>
