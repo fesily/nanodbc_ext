@@ -1,6 +1,7 @@
 #pragma once 
-#ifndef NANODBC_ENABLE_UNICODE
-#define NANODBC_ENABLE_UNICODE 1
-#endif
+#include <nanodbc_ext/nanodbc_ext_config.h>
 #include <nanodbc_ext/statement2.h>
 #include <nanodbc_ext/nanodbc_async.h>
+#ifdef _MSC_VER
+#pragma comment(lib,"odbc32.lib")
+#endif  

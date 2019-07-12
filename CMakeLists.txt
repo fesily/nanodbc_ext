@@ -3,6 +3,15 @@ cmake_minimum_required(VERSION 3.8)
 project(nanodbc_ext CXX)
 
 option(NANODBC_DISABLE_INSTALL "Do not generate install target" OFF)
+option(NANODBC_ASYNC_FOLLY "async future depend on folly" OFF)
+option(NANODBC_ASYNC_PPL "async future depend on ppl" OFF)
+option(NANODBC_ASYNC_ASYNCPLUSPLUS "async future depend on async++" OFF)
+option(NANODBC_HEADER_ONLY "part of async is header only" OFF)
+
+if(NOT NANODBC_ASYNC_FOLLY AND NOT NANODBC_ASYNC_PPL AND NOT NANODBC_ASYNC_ASYNCPLUSPLUS)
+  set(NANODBC_HEADER_ONLY ON)
+endif()
+
 
 ########################################
 ## require and enable C++0x/11/14/17
@@ -52,11 +61,29 @@ elseif(MSVC)
     message(FATAL_ERROR, "nanodbc requires C++11-compliant compiler")
   endif()
 endif()
+set(BUILD_SRC_FILES nanodbc_ext/statement2.cpp)
+
+if(NOT NANODBC_HEADER_ONLY)
+  if(NANODBC_ASYNC_FOLLY)
+    find_library(folly CONFIG REQUIRED)
+    list(APPEND BUILD_SRC_FILES nanodbc_ext/detail/async_folly.cpp)
+	include_directories(folly)
+	link_libraries(folly)
+  elseif(NANODBC_ASYNC_PPL)
+    list(APPEND BUILD_SRC_FILES nanodbc_ext/detail/async_ppl.cpp)
+  elseif(NANODBC_ASYNC_ASYNCPLUSPLUS)
+    find_library(async++  CONFIG REQUIRED)
+    list(APPEND BUILD_SRC_FILES nanodbc_ext/detail/async_asyncplusplus.cpp)
+	include_directories(Async++)
+	link_libraries(Async++)
+  else()
+    message(FATAL_ERROR, "unkown async futuer lib")
+  endif()
+endif()
 
 find_package(nanodbc CONFIG REQUIRED)
 
-
-add_library(nanodbc_ext STATIC nanodbc_ext/nanodbc_async.cpp nanodbc_ext/statement2.cpp)
+add_library(nanodbc_ext STATIC ${BUILD_SRC_FILES})
 
 target_link_libraries(nanodbc_ext PRIVATE nanodbc)
 
@@ -80,10 +107,27 @@ if(NOT NANODBC_DISABLE_INSTALL)
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)
 
+    install(FILES nanodbc_ext/nanodbc_ext_config.h DESTINATION include/nanodbc_ext)
     install(FILES nanodbc_ext/nanodbc_ext.h DESTINATION include/nanodbc_ext)
     install(FILES nanodbc_ext/nanodbc_async.h DESTINATION include/nanodbc_ext)
     install(FILES nanodbc_ext/statement2.h DESTINATION include/nanodbc_ext)
-
-	install(EXPORT ${NANODBC_CONFIG} DESTINATION cmake)
+    if(NANODBC_HEADER_ONLY)
+      install(FILES nanodbc_ext/detail/WinEvent.h DESTINATION include/nanodbc_ext/detail)
+      install(FILES nanodbc_ext/detail/async_ppl.h DESTINATION include/nanodbc_ext/detail)
+      install(FILES nanodbc_ext/detail/async_ppl-inl.h DESTINATION include/nanodbc_ext/detail)
+      install(FILES nanodbc_ext/detail/async_folly.h DESTINATION include/nanodbc_ext/detail)
+      install(FILES nanodbc_ext/detail/async_folly-inl.h DESTINATION include/nanodbc_ext/detail)
+      install(FILES nanodbc_ext/detail/async_asyncplusplus.h DESTINATION include/nanodbc_ext/detail)
+      install(FILES nanodbc_ext/detail/async_asyncplusplus-inl.h DESTINATION include/nanodbc_ext/detail)
+	else()
+	  if(NANODBC_ASYNC_FOLLY)
+		install(FILES nanodbc_ext/detail/async_folly.h DESTINATION include/nanodbc_ext/detail)
+	  elseif(NANODBC_ASYNC_PPL)
+		install(FILES nanodbc_ext/detail/async_ppl.h DESTINATION include/nanodbc_ext/detail)
+	  elseif(NANODBC_ASYNC_ASYNCPLUSPLUS)
+	    install(FILES nanodbc_ext/detail/async_asyncplusplus.h DESTINATION include/nanodbc_ext/detail)
+	  endif()
+    endif()
+	  install(EXPORT ${NANODBC_CONFIG} DESTINATION cmake)
     export(TARGETS nanodbc_ext FILE ${NANODBC_CONFIG}.cmake)
 endif()
