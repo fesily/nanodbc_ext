@@ -47,4 +47,4 @@ namespace nanodbc
         co_return ret;
     }
 }
-#include <nanodbc/nanodbc_boost_pfr_cast.hpp>
+#include <nanodbc_ext/nanodbc_boost_pfr_cast.hpp>

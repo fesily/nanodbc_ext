@@ -14,4 +14,4 @@
 #include <boost/pfr.hpp>
 #endif
 
-#include <nanodbc/nanodbc_cast.hpp>
+#include <nanodbc_ext/nanodbc_cast.hpp>
