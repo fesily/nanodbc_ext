@@ -2,7 +2,7 @@
 
 #include <nanodbc_ext/detail/async_cppcoro.h>
 #include <nanodbc_ext/detail/WinEvent.h>
-
+#include <cppcoro/single_consumer_event.hpp>
 #if defined(_WIN32) || defined(_WIN64)
 #pragma comment(lib,"Synchronization.lib")
 #endif
