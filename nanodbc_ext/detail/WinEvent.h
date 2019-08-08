@@ -11,9 +11,9 @@ std::pair<boost::winapi::WAITORTIMERCALLBACK_, std::shared_ptr<void>> GetRegiste
     auto cb = [](boost::winapi::PVOID_ ptr, boost::winapi::BOOLEAN_ timeOut) {
         (*static_cast<Func*>(ptr))(timeOut == TRUE);
     };
-    return { cb, std::shared_ptr<void*>(new Func(std::forward<Func>(func),[](void* data) {
-            delete reinterpret_cast<std::decay_t<Func>*>(data);
-        }) };
+    return { cb, std::shared_ptr<void*>(new Func(std::forward<Func>(func)),[](void* data) {
+            delete reinterpret_cast<std::decay_t<Func>*>(data); }
+        ) };
 }
 
 namespace details

@@ -1,6 +1,7 @@
 #pragma once 
 
 #include <nanodbc_ext/detail/async_cppcoro.h>
+#include <nanodbc_ext/detail/WinEvent.h>
 #include <cppcoro/single_consumer_event.hpp>
 #include <cppcoro/static_thread_pool.hpp>
 #include <cppcoro/io_service.hpp>
@@ -8,8 +9,6 @@
 #if defined(_WIN32) || defined(_WIN64)
 #pragma comment(lib,"Synchronization.lib")
 #endif
-#include <sql.h>
-#include <sqlext.h>
 
 namespace nanodbc {
 
@@ -34,28 +33,6 @@ namespace nanodbc {
         }
     };
 
-    struct cancel
-    {
-        cancel( SQLHANDLE SQLHandle)
-            : SQLHandle_{ SQLHandle }
-        {
-
-        }
-        void reset()
-        {
-            SQLHandle_ = nullptr;
-        }
-        ~cancel()
-        {
-            if (SQLHandle_ != nullptr)
-            {
-                SQLCancelHandle(SQL_HANDLE_DBC, SQLHandle_);
-                SQLHandle_ = nullptr;
-            }
-        }
-        std::atomic<SQLHANDLE> SQLHandle_;
-    };
-
     template <typename Result, typename Begin, typename Complete, typename = std::enable_if_t<!std::is_void_v<Result>>>
     cppcoro::task<Result> async_event_task(Begin&& begin, Complete&& complete)
     {
@@ -63,11 +40,12 @@ namespace nanodbc {
         if (begin(event))
         {
             assert(event != nullptr);
-            cancel lock(con.native_dbc_handle());
             auto& this_service = schedule::this_thread_io_service();
             co_await schedule::odbc_static_thread_pool().schedule();
-            if(::WaitForSingleObject(event, timeout) != WAIT_TIMEOUT)
-                lock.reset();
+            if (::WaitForSingleObject(event, timeout) != WAIT_TIMEOUT)
+            {
+
+            }
             co_await this_service.schedule();
         }
         co_return complete();
@@ -80,11 +58,12 @@ namespace nanodbc {
         if (begin(event))
         {
             assert(event != nullptr);
-            cancel lock(con.native_dbc_handle());
             auto& this_service = schedule::this_thread_io_service();
             co_await schedule::odbc_static_thread_pool().schedule();
-            if(::WaitForSingleObject(event, timeout) != WAIT_TIMEOUT)
-                lock.reset();
+            if (::WaitForSingleObject(event, timeout) != WAIT_TIMEOUT)
+            {
+
+            }
             co_await this_service.schedule();
         }
         complete();
@@ -124,7 +103,6 @@ namespace nanodbc {
             [=]() mutable {
                 return stm.complete_execute(batch_operations);
             }
-
             );
     }
 
