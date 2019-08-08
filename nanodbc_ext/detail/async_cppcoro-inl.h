@@ -1,48 +1,76 @@
 #pragma once 
 
 #include <nanodbc_ext/detail/async_cppcoro.h>
-#include <nanodbc_ext/detail/WinEvent.h>
 #include <cppcoro/single_consumer_event.hpp>
+#include <cppcoro/static_thread_pool.hpp>
+#include <cppcoro/io_service.hpp>
+
 #if defined(_WIN32) || defined(_WIN64)
 #pragma comment(lib,"Synchronization.lib")
 #endif
+#include <sql.h>
+#include <sqlext.h>
 
 namespace nanodbc {
+
+    struct schedule{
+        static cppcoro::static_thread_pool& odbc_static_thread_pool()
+        {
+            static cppcoro::static_thread_pool pool(std::thread::hardware_concurrency() * 2 + 1);
+            return pool;
+        }
+        static cppcoro::io_service& this_thread_io_service()
+        {
+            static thread_local cppcoro::io_service service;
+            return service;
+        }
+        static void run_one()
+        {
+            this_thread_io_service().process_one_pending_event();
+        }
+        static void run()
+        {
+            this_thread_io_service().process_pending_events();
+        }
+    };
+
+    struct cancel
+    {
+        cancel( SQLHANDLE SQLHandle)
+            : SQLHandle_{ SQLHandle }
+        {
+
+        }
+        void reset()
+        {
+            SQLHandle_ = nullptr;
+        }
+        ~cancel()
+        {
+            if (SQLHandle_ != nullptr)
+            {
+                SQLCancelHandle(SQL_HANDLE_DBC, SQLHandle_);
+                SQLHandle_ = nullptr;
+            }
+        }
+        std::atomic<SQLHANDLE> SQLHandle_;
+    };
 
     template <typename Result, typename Begin, typename Complete, typename = std::enable_if_t<!std::is_void_v<Result>>>
     cppcoro::task<Result> async_event_task(Begin&& begin, Complete&& complete)
     {
         details::WinEvent event;
-        Result result;
         if (begin(event))
         {
             assert(event != nullptr);
-            boost::winapi::HANDLE_ newWaitObject;
-            cppcoro::single_consumer_event consumer_event;
-            std::exception_ptr exception_ptr;
-            auto [fn, ptr] = GetRegisterWaitForSingleObjectFunc([&,complete=std::move(complete)]() mutable {
-                try
-                {
-                    result = complete();
-                }
-                catch (...)
-                {
-                    exception_ptr = std::current_exception();
-                }
-                consumer_event.set();
-            });
-            boost::winapi::RegisterWaitForSingleObject(&newWaitObject, event, fn, ptr, -1, boost::winapi::WT_EXECUTEDEFAULT_ | boost::winapi::WT_EXECUTEONLYONCE_);
-
-            co_await consumer_event;
-            if(exception_ptr)
-            {
-                std::rethrow_exception(exception_ptr);
-            }
-            
-            co_return result;
+            cancel lock(con.native_dbc_handle());
+            auto& this_service = schedule::this_thread_io_service();
+            co_await schedule::odbc_static_thread_pool().schedule();
+            if(::WaitForSingleObject(event, timeout) != WAIT_TIMEOUT)
+                lock.reset();
+            co_await this_service.schedule();
         }
-        result = complete();
-        co_return result;
+        co_return complete();
     }
 
     template <typename Result,typename Begin, typename Complete,typename =std::enable_if_t<std::is_void_v<Result>>>
@@ -52,28 +80,12 @@ namespace nanodbc {
         if (begin(event))
         {
             assert(event != nullptr);
-            boost::winapi::HANDLE_ newWaitObject;
-            cppcoro::single_consumer_event consumer_event;
-            std::exception_ptr exception_ptr;
-            auto [fn, ptr] = GetRegisterWaitForSingleObjectFunc([&, complete = std::move(complete)]() mutable {
-                try
-                {
-                    complete();
-                }
-                catch (...)
-                {
-                    exception_ptr = std::current_exception();
-                }
-                consumer_event.set();
-            });
-            boost::winapi::RegisterWaitForSingleObject(&newWaitObject, event, fn, ptr, -1, boost::winapi::WT_EXECUTEDEFAULT_ | boost::winapi::WT_EXECUTEONLYONCE_);
-            co_await consumer_event;
-            if(exception_ptr)
-            {
-                std::rethrow_exception(exception_ptr);
-            }
-
-            co_return;
+            cancel lock(con.native_dbc_handle());
+            auto& this_service = schedule::this_thread_io_service();
+            co_await schedule::odbc_static_thread_pool().schedule();
+            if(::WaitForSingleObject(event, timeout) != WAIT_TIMEOUT)
+                lock.reset();
+            co_await this_service.schedule();
         }
         complete();
         co_return;

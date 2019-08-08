@@ -6,13 +6,14 @@
 #include <atomic>
 #include <cassert>
 template <typename Func>
-std::pair<boost::winapi::WAITORTIMERCALLBACK_, void*> GetRegisterWaitForSingleObjectFunc(Func&& func)
+std::pair<boost::winapi::WAITORTIMERCALLBACK_, std::shared_ptr<void>> GetRegisterWaitForSingleObjectFunc(Func&& func)
 {
-    auto cb = [](boost::winapi::PVOID_ ptr, boost::winapi::BOOLEAN_) {
-        std::unique_ptr<std::decay_t<Func>> context(static_cast<Func*>(ptr));
-        (*context)();
+    auto cb = [](boost::winapi::PVOID_ ptr, boost::winapi::BOOLEAN_ timeOut) {
+        (*static_cast<Func*>(ptr))(timeOut == TRUE);
     };
-    return { cb, std::make_unique<std::decay_t<Func>>(std::forward<Func>(func)).release() };
+    return { cb, std::shared_ptr<void*>(new Func(std::forward<Func>(func),[](void* data) {
+            delete reinterpret_cast<std::decay_t<Func>*>(data);
+        }) };
 }
 
 namespace details
